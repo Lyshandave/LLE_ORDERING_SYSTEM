@@ -1,0 +1,570 @@
+using Microsoft.VisualBasic;
+using System.Drawing.Printing;
+using System.Text;
+
+namespace ORDERING_SYSTEM
+{
+    public partial class OrderingSystem : Form
+    {
+        // UI controls
+        private FlowLayoutPanel? flowMenu;
+        private FlowLayoutPanel flowPanelOrder;
+        private Label totalLabel;
+        private decimal totalAmount = 0;
+        private readonly TextBox? customerNameBox;
+        private string lastReceiptText = "";
+        private string? selectedOrderItem = null;
+        private Button? globalPlusButton;
+        private Button? globalMinusButton;
+        private readonly Dictionary<string, (int quantity, decimal price)> orderData = [];
+
+        public OrderingSystem()
+        {
+            
+            flowPanelOrder = new FlowLayoutPanel();
+            totalLabel = new Label();
+            InitializeUI();
+        }
+
+        private void InitializeUI()
+        {
+            // Set basic form properties
+            Text = "LLE ORDERING SYSTEM";
+            Size = new Size(1200, 700);
+            StartPosition = FormStartPosition.CenterScreen;
+            BackColor = Color.White;
+
+            // === HEADER TITLE ===
+            Label header = new()
+            {
+                Text = "LLE ORDERING SYSTEM",
+                Font = new Font("Segoe UI", 18, FontStyle.Bold),
+                ForeColor = Color.Maroon,
+                AutoSize = false,                // Important: Disable autosize so we can control height
+                Height = 60,                     // Fixed height for header
+                Dock = DockStyle.Top,            // Dock to top of the form
+                TextAlign = ContentAlignment.MiddleLeft,
+                Padding = new Padding(15, 10, 0, 10)
+            };
+            Controls.Add(header); // Add header first
+
+            // === MAIN CONTENT AREA BELOW HEADER ===
+            TableLayoutPanel mainLayout = new ()
+            {
+                Location = new Point(0, header.Bottom),                         // Start just below header
+                Size = new Size(ClientSize.Width, ClientSize.Height - header.Height), // Fill remaining space
+                Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
+                ColumnCount = 2
+            };
+            mainLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 70F)); // Left = Menu
+            mainLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 40F)); // Right = Order summary
+            Controls.Add(mainLayout); // Add to form after header
+
+            // === LEFT PANEL: MENU SECTION ===
+            Panel leftPanel = new()
+            {
+                Dock = DockStyle.Fill,
+                Padding = new Padding(50, 22, 0, 0) // Adds spacing around menu area
+            };
+            mainLayout.Controls.Add(leftPanel, 0, 0);
+
+            // 🟨 Add bordered box (Panel) for Menu section
+            Panel menuBox = new ()
+            {
+                Location = new Point(50, 50), // Adjust Y to leave space for the "Menu" label
+                Size = new Size(661, 530),   // Customize width & height as needed
+                BorderStyle = BorderStyle.FixedSingle,
+                BackColor = Color.White,
+                Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right
+            };
+            leftPanel.Controls.Add(menuBox);         
+
+            // 🟨 Add "Menu" label at the top
+            Label menuLabel = new ()
+            {
+                Text = "Menu",
+                Font = new Font("Segoe UI", 11, FontStyle.Bold),
+                ForeColor = Color.Black,
+                Dock = DockStyle.Top,
+                AutoSize = true,
+                Location = new Point(menuBox.Left, menuBox.Top - 30),
+                Padding = new Padding(10, 0, 0, 0)
+            };
+            leftPanel.Controls.Add(menuLabel);
+
+            // 🟨 Menu flow layout panel (inside the bordered panel)
+            flowMenu = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                AutoScroll = true,
+                WrapContents = true,
+                Padding = new Padding(1)
+            };
+            menuBox.Controls.Add(flowMenu);
+
+            // RIGHT PANEL: order summary
+            Panel rightPanel = new() 
+            { 
+                Dock = DockStyle.Fill, Padding = new Padding(30) };
+                mainLayout.Controls.Add(rightPanel, 1, 0);
+
+            // "Order Summary" Label (moved visually above the box)
+            Label summaryLabel = new ()
+            {
+                Text = "Order Summary",
+                Font = new Font("Segoe UI", 11, FontStyle.Bold),
+                ForeColor = Color.Black,
+                AutoSize = true,
+                Location = new Point(105, 0), // Position it manually
+                Padding = new Padding(0, 25, 0, 0)
+            };
+            rightPanel.Controls.Add(summaryLabel);
+
+            Panel orderBox = new ()
+            {
+                Location = new Point(15, 55), // offset from top
+                Size = new Size(360, 332),    // fixed size
+                BorderStyle = BorderStyle.FixedSingle,
+                BackColor = Color.White,
+                Anchor = AnchorStyles.Top | AnchorStyles.Left // ← prevent auto-resizing
+            };
+            rightPanel.Controls.Add(orderBox);
+
+            flowPanelOrder = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                AutoScroll = true,
+                WrapContents = false,
+                FlowDirection = FlowDirection.TopDown,
+                Padding = new Padding(1),
+                BackColor = Color.White
+            };
+            orderBox.Controls.Add(flowPanelOrder); // ✅ embedded inside the bordere
+
+            int baseY = 380; // unified Y-coordinate for total + buttons
+
+            // Total label
+            totalLabel = new Label
+            {
+                Text = "Total: ₱0.00",
+                Font = new Font("Segoe UI", 12, FontStyle.Bold),
+                ForeColor = Color.Green,
+                Location = new Point(10, baseY),
+                AutoSize = true
+            };
+            rightPanel.Controls.Add(totalLabel);
+
+            // GLOBAL MINUS button
+            globalMinusButton = new Button
+            {
+                Text = "–",
+                Size = new Size(40, 40),
+                Font = new Font("Segoe UI", 18, FontStyle.Bold),
+                Location = new Point(totalLabel.Right + 140, baseY - 10),
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.White,
+                ForeColor = Color.Black,
+                TabStop = false,
+                Cursor = Cursors.Hand
+            };
+            globalMinusButton.FlatAppearance.BorderSize = 0;
+            rightPanel.Controls.Add(globalMinusButton);
+
+            // GLOBAL PLUS button
+            globalPlusButton = new Button
+            {
+                Text = "+",
+                Size = new Size(40, 40),
+                Font = new Font("Segoe UI", 18, FontStyle.Bold),
+                Location = new Point(globalMinusButton.Right + 10, baseY - 10),
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.White,
+                ForeColor = Color.Black,
+                TabStop = false,
+                Cursor = Cursors.Hand
+            };
+            globalPlusButton.FlatAppearance.BorderSize = 0;
+            rightPanel.Controls.Add(globalPlusButton);
+
+            // MINUS button logic
+            globalMinusButton.Click += (s, e) =>
+            {
+                if (selectedOrderItem != null && orderData.ContainsKey(selectedOrderItem))
+                {
+                    if (orderData[selectedOrderItem].quantity > 1)
+                    {
+                        orderData[selectedOrderItem] = (
+                            orderData[selectedOrderItem].quantity - 1,
+                            orderData[selectedOrderItem].price
+                        );
+                    }
+                    else
+                    {
+                        orderData.Remove(selectedOrderItem);
+                        selectedOrderItem = null;
+                    }
+                    RefreshOrderPanel();
+                }
+            };
+
+            // PLUS button logic
+            globalPlusButton.Click += (s, e) =>
+            {
+                if (selectedOrderItem != null && orderData.TryGetValue(selectedOrderItem, out var item))
+                {
+                    orderData[selectedOrderItem] = (item.quantity + 1, item.price);
+                    RefreshOrderPanel();
+                }
+            };
+
+            // ADD BUTTONS TO PANEL
+            rightPanel.Controls.Add(globalMinusButton);
+            rightPanel.Controls.Add(globalPlusButton);
+
+            // PLACE ORDER BUTTON
+            Button saveBtn = new ()
+            {
+                Text = "Place Order",
+                Size = new Size(365, 50),
+                Location = new Point(10, 430),
+                BackColor = Color.ForestGreen,
+                ForeColor = Color.White,
+                Font = new Font("Segoe UI", 12, FontStyle.Bold)
+            };
+            saveBtn.Click += SaveOrder;
+            rightPanel.Controls.Add(saveBtn);
+
+            // CLEAR ORDER BUTTON
+            Button clearBtn = new ()
+            {
+                Text = "Clear Order",
+                Size = new Size(365, 50),
+                Location = new Point(10, 485),
+                BackColor = Color.Maroon,
+                ForeColor = Color.White,
+                Font = new Font("Segoe UI", 12, FontStyle.Bold)
+            };
+            clearBtn.Click += (s, e) =>
+            {
+                orderData.Clear();
+                selectedOrderItem = null; // Deselect item
+                RefreshOrderPanel();
+            };
+            rightPanel.Controls.Add(clearBtn);
+
+
+            // View Saved Orders
+            Button viewBtn = new ()
+            {
+                Text = "View Saved Orders",
+                Size = new Size(365, 50),
+                Location = new Point(10, 540),
+                BackColor = Color.MediumSlateBlue,
+                ForeColor = Color.White,
+                Font = new Font("Segoe UI", 12, FontStyle.Bold)
+            };
+            viewBtn.Click += (s, e) => ShowSavedOrdersUI();
+            rightPanel.Controls.Add(viewBtn);
+
+            // Load menu items
+            var menu = new Menu();
+            menu.CreateMenuButtons(flowMenu, AddToOrder);
+        }
+
+        // ✅ Add item logic
+        public void AddToOrder(string itemName, decimal price)
+        {
+            if (orderData.TryGetValue(itemName, out var item))
+                orderData[itemName] = (item.quantity + 1, price);
+            else
+                orderData[itemName] = (1, price);
+
+            RefreshOrderPanel();
+        }
+
+        // ✅ Update FlowLayoutPanel display
+        private void RefreshOrderPanel()
+        {
+            flowPanelOrder.Controls.Clear();
+            totalAmount = 0;
+
+            foreach (var entry in orderData)
+            {
+                string itemName = entry.Key;
+                int quantity = entry.Value.quantity;
+                decimal price = entry.Value.price;
+                decimal lineTotal = quantity * price;
+                totalAmount += lineTotal;
+
+                Label itemLabel = new ()
+                {
+                    Text = $"{itemName} x{quantity} = ₱{lineTotal}",
+                    AutoSize = false,
+                    Width = 350,
+                    Height = 30,
+                    Margin = new Padding(1),
+                    TextAlign = ContentAlignment.MiddleLeft,
+                    Font = new Font("Segoe UI", 12, FontStyle.Regular),
+                    BackColor = itemName == selectedOrderItem ? Color.LightBlue : Color.WhiteSmoke,
+                    Cursor = Cursors.Hand
+                };
+
+                itemLabel.Click += (s, e) =>
+                {
+                    selectedOrderItem = itemName;
+                    RefreshOrderPanel();
+                };
+
+                flowPanelOrder.Controls.Add(itemLabel);
+            }
+
+            totalLabel.Text = $"Total: ₱{totalAmount}";
+        }
+        private void SaveOrder(object? sender, EventArgs e)
+        {
+            if (orderData.Count == 0)
+            {
+                MessageBox.Show("Add at least one item before placing the order.");
+                return;
+            }
+            string folder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "SavedOrders");
+            Directory.CreateDirectory(folder);
+
+            // Load or initialize the order number
+            string orderNumberFile = Path.Combine(folder, "last_order_number.txt");
+            int orderNumber = 1;
+
+            if (File.Exists(orderNumberFile))
+            {
+                string content = File.ReadAllText(orderNumberFile);
+
+                if (int.TryParse(content, out int parsedNumber) && parsedNumber > 0)
+                {
+                    orderNumber = parsedNumber + 1;
+                }
+                else
+                {
+                    // Optional: Log or handle corrupted file content
+                    orderNumber = 1;
+                }
+            }
+            File.WriteAllText(orderNumberFile, orderNumber.ToString());
+
+            // Prepare filename and file path
+            string datePart = DateTime.Now.ToString("yyyyMMdd");
+            string timePart = DateTime.Now.ToString("HHmmss");
+            string filename = $"order_{orderNumber:000}_{datePart}_{timePart}.txt";
+            string filepath = Path.Combine(folder, filename);
+
+            // Build receipt content
+            string user = SessionInfo.CurrentUser ?? "Unknown";
+
+            StringBuilder receipt = new ();
+
+            // Header
+            receipt.AppendLine("                        LLE ORDERING SYSTEM RECEIPT");
+            receipt.AppendLine("===========================================");
+            receipt.AppendLine($"Order#: {orderNumber:000}");
+            receipt.AppendLine($"Date: {DateTime.Now:MMMM dd, yyyy hh:mm tt}");
+            receipt.AppendLine($"Cashier: {user}");
+            receipt.AppendLine("-------------------------------------------");
+            receipt.AppendLine($"{"Item",-36} {"Qty",5}   {"Price",10}");
+            receipt.AppendLine("-------------------------------------------");
+
+            // Items
+            foreach (var entry in orderData)
+            {
+                string item = entry.Key;
+                int qty = entry.Value.quantity;
+                decimal price = entry.Value.price * qty;
+
+                receipt.AppendLine($"{item,-36} {qty,5}   ₱{price,10:N2}");
+            }
+
+            // Total
+            receipt.AppendLine("-------------------------------------------");
+            receipt.AppendLine($"{"TOTAL:",-36} ₱{totalAmount,10:N2}");
+            receipt.AppendLine("===========================================");
+            receipt.AppendLine("                      Thank you! Please come again!");
+            receipt.AppendLine("===========================================");
+
+
+            // Save to file
+            File.WriteAllText(filepath, receipt.ToString());
+
+            // Store receipt for printing
+            lastReceiptText = receipt.ToString();
+
+            // Display receipt pop-up
+            MessageBox.Show(lastReceiptText, $"ORDER #{orderNumber:000}", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+            // 🔽 Auto-print
+            PrintDocument pd = new();
+            pd.PrintPage += (s, args) =>
+            {
+                Graphics g = args.Graphics!;
+                Font printFont = new("Consolas", 10);
+                float lineHeight = printFont.GetHeight(g) + 2;
+                float x = 10;
+                float y = 10;
+
+                foreach (string line in lastReceiptText.Split('\n'))
+                {
+                    g.DrawString(line.TrimEnd(), printFont, Brushes.Black, x, y);
+                    y += lineHeight;
+                }
+            };
+
+            try
+            {
+                pd.Print();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Printer error: " + ex.Message);
+            }
+
+            // Clear order
+            orderData.Clear();
+            RefreshOrderPanel();
+        }
+        private static void ShowSavedOrdersUI()
+        {
+            string password = Interaction.InputBox("Enter admin password:", "Admin Access", "", -1, -1);
+            if (password != "123")
+            {
+                MessageBox.Show("Incorrect password. Access denied.");
+                return;
+            }
+
+            // === Form setup ===
+            Form savedOrdersForm = new ()
+            {
+                Text = "Saved Orders",
+                Size = new Size(1000, 600),
+                StartPosition = FormStartPosition.CenterScreen
+            };
+
+            // === UI Controls ===
+            ListBox dateListBox = new () { Location = new Point(10, 10), Size = new Size(200, 520) };
+            ListBox ordersListBox = new () { Location = new Point(220, 10), Size = new Size(300, 520) };
+            TextBox orderDetailsBox = new ()
+            {
+                Location = new Point(530, 10),
+                Size = new Size(440, 450),
+                Multiline = true,
+                ScrollBars = ScrollBars.Vertical,
+                ReadOnly = true,
+                Font = new Font("Consolas", 10) // ✅ Monospaced font for aligned receipt
+            };
+            Button deleteButton = new ()
+            {
+                Text = "Delete Selected Order",
+                Location = new Point(530, 470),
+                Size = new Size(440, 40),
+                BackColor = Color.Red,
+                ForeColor = Color.White
+            };
+
+             savedOrdersForm.Controls.AddRange([
+                 dateListBox,
+                 ordersListBox,
+                 orderDetailsBox,
+                 deleteButton
+             ]);
+            // === Load saved order files ===
+            string folderPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "SavedOrders");
+            if (!Directory.Exists(folderPath))
+            {
+                MessageBox.Show("No saved orders found.");
+                return;
+            }
+
+            var filesByDate = Directory.GetFiles(folderPath, "*.txt")
+                .GroupBy(f => File.GetCreationTime(f).ToString("MMMM dd, yyyy"))
+                .OrderByDescending(g => DateTime.Parse(g.Key));
+
+            foreach (var group in filesByDate)
+                dateListBox.Items.Add(group.Key);
+
+            // === Handle date selection ===
+            dateListBox.SelectedIndexChanged += (s, e) =>
+            {
+                ordersListBox.Items.Clear();
+                orderDetailsBox.Clear();
+
+                if (dateListBox.SelectedItem == null) return;
+
+                string selectedDate = dateListBox.SelectedItem.ToString()!;
+                var files = Directory.GetFiles(folderPath, "*.txt")
+                    .Where(f => File.GetCreationTime(f).ToString("MMMM dd, yyyy") == selectedDate)
+                    .ToArray();
+
+                decimal totalSales = 0;
+
+                foreach (var file in files)
+                {
+                    ordersListBox.Items.Add(new OrderFile
+                    {
+                        Path = file,
+                        DisplayName = Path.GetFileNameWithoutExtension(file)
+                    });
+
+                    // Extract total from each receipt file
+                    string[] lines = File.ReadAllLines(file);
+                    var totalLine = lines.FirstOrDefault(l => l.Trim().StartsWith("TOTAL:"));
+                    if (totalLine != null)
+                    {
+                            string digits = string.Concat(totalLine.Where(c => char.IsDigit(c) || c == '.' || c == ','));
+                            if (decimal.TryParse(digits, out decimal amount))
+                                totalSales += amount;
+                    }
+                }
+
+                ordersListBox.DisplayMember = "DisplayName";
+
+                // Show daily total at the top of the TextBox
+                orderDetailsBox.Text = $"TOTAL SALES for {selectedDate}: ₱{totalSales:0.00}\r\n\r\n";
+            };
+
+            // === Handle order selection ===
+            ordersListBox.SelectedIndexChanged += (s, e) =>
+            {
+                if (ordersListBox.SelectedItem is OrderFile ofile)
+                {
+                    string content = File.ReadAllText(ofile.Path);
+
+                    // Append to existing summary
+                    if (!string.IsNullOrWhiteSpace(orderDetailsBox.Text))
+                        orderDetailsBox.AppendText("\r\n" + content);
+                    else
+                        orderDetailsBox.Text = content;
+                }
+            };
+
+            // === Delete button functionality ===
+            deleteButton.Click += (s, e) =>
+            {
+                if (ordersListBox.SelectedItem is OrderFile ofile)
+                {
+                    var confirm = MessageBox.Show("Are you sure you want to delete this order?", "Confirm", MessageBoxButtons.YesNo);
+                    if (confirm == DialogResult.Yes)
+                    {
+                        File.Delete(ofile.Path);
+                        ordersListBox.Items.Remove(ofile);
+                        orderDetailsBox.Clear();
+                    }
+                }
+            };
+
+            // === Show the window ===
+            savedOrdersForm.ShowDialog();
+        }
+        private class OrderFile
+        {
+            public required string Path { get; set; }
+            public string?DisplayName { get; set; }
+            public override string ToString() => DisplayName ?? string.Empty;
+        }
+    }
+}
