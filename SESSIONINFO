@@ -1,0 +1,7 @@
+namespace ORDERING_SYSTEM
+{
+    public static class SessionInfo
+    {
+        public static string CurrentUser { get; set; } = "Customer";
+    }
+}
