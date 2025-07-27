@@ -1,0 +1,89 @@
+namespace ORDERING_SYSTEM
+{
+    public class Menu
+    {
+        public Dictionary<string, (decimal Price, string ImageUrl)> MenuItems { get; private set; }
+
+        public Menu()
+        {
+            MenuItems = new Dictionary<string, (decimal, string)>
+            {
+                { "Cheeseburger", (65, "https://upload.wikimedia.org/wikipedia/commons/3/30/Cheeseburger.jpg") },
+                { "Double Cheeseburger", (120, "https://upload.wikimedia.org/wikipedia/commons/1/1f/McDonald%27s_Cheeseburger.jpg") },
+                { "Big Mac", (150, "https://upload.wikimedia.org/wikipedia/commons/1/16/Big_Mac_hamburger.jpg") },
+                { "Quarter Pounder", (145, "https://upload.wikimedia.org/wikipedia/commons/d/d2/Quarter_Pounder_with_Cheese.png") },
+                { "1pc LLE Chicken", (105, "https://upload.wikimedia.org/wikipedia/commons/1/11/Fried_chicken_-_Arnold_Gatilao.jpg") },
+                { "2pc LLE Chicken", (190, "https://upload.wikimedia.org/wikipedia/commons/4/45/Fried_chicken_chips_coleslaw.jpg") },
+                { "Regular Fries", (60, "https://upload.wikimedia.org/wikipedia/commons/1/13/French_Fries.JPG") },
+                { "Large Fries", (85, "https://upload.wikimedia.org/wikipedia/commons/f/fc/French_fries_002.jpg") },
+                { "LLE Spaghetti", (75, "https://upload.wikimedia.org/wikipedia/commons/4/4b/Filipino_spaghetti.jpg") },
+                { "Coke Float", (55, "https://upload.wikimedia.org/wikipedia/commons/2/28/Cola_float.jpg") },
+                { "Iced Tea", (45, "https://upload.wikimedia.org/wikipedia/commons/2/2f/Iced_Tea_Sweet.jpg") },
+                { "LLE Coffee", (65, "https://upload.wikimedia.org/wikipedia/commons/4/45/A_small_cup_of_coffee.JPG") },
+                { "Sundae", (45, "https://upload.wikimedia.org/wikipedia/commons/3/36/Sundae.jpg") },
+                { "Apple Pie", (35, "https://upload.wikimedia.org/wikipedia/commons/4/45/Apple_pie.jpg") }
+            };
+        }
+
+        public void CreateMenuButtons(FlowLayoutPanel flowMenu, Action<string, decimal> addItemToOrder)
+        {
+            flowMenu.Controls.Clear();
+
+            foreach (var item in MenuItems)
+            {
+                string itemName = item.Key;
+                decimal price = item.Value.Price;
+                string imageUrl = item.Value.ImageUrl;
+
+                Panel panel = new ()
+                {
+                    Width = 145,
+                    Height = 145,
+                    Margin = new Padding(7),
+                    BackColor = Color.White,
+                    BorderStyle = BorderStyle.FixedSingle,
+                    Cursor = Cursors.Hand
+                };
+
+                PictureBox pic = new ()
+                {
+                    Width = 130,
+                    Height = 90,
+                    SizeMode = PictureBoxSizeMode.Zoom,
+                    Top = 5,
+                    Left = 10,
+                    ImageLocation = imageUrl // ✅ This is better than LoadAsync
+                };
+
+                // Optional fallback: show placeholder if failed
+                pic.LoadCompleted += (s, e) =>
+                {
+                    if (e.Error != null)
+                    {
+                        pic.Image = SystemIcons.Warning.ToBitmap(); // fallback icon
+                    }
+                };
+
+                Label lbl = new ()
+                {
+                    Text = $"{itemName}\n₱{price}",
+                    TextAlign = ContentAlignment.MiddleCenter,
+                    Font = new Font("Segoe UI", 9, FontStyle.Bold),
+                    ForeColor = Color.Black,
+                    Width = panel.Width,
+                    Top = 100,
+                    Height = 45
+                };
+
+                void HandleClick(object? sender, EventArgs e) => addItemToOrder(itemName, price);
+                panel.Click += HandleClick;
+                pic.Click += HandleClick;
+                lbl.Click += HandleClick;
+
+                panel.Controls.Add(pic);
+                panel.Controls.Add(lbl);
+                flowMenu.Controls.Add(panel);
+            }
+        }
+    }
+}
