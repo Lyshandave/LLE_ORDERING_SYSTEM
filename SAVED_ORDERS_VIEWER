@@ -1,0 +1,96 @@
+using System.Globalization;
+
+namespace ORDERING_SYSTEM
+{
+    public class SavedOrdersViewer : Form
+    {
+        private readonly ListBox ordersListBox = new();
+        private readonly TextBox orderDetailsBox = new();
+
+        public SavedOrdersViewer()
+        {
+            Text = "Saved Orders";
+            Size = new Size(800, 500);
+            StartPosition = FormStartPosition.CenterParent;
+
+            // List of orders
+            ordersListBox.Dock = DockStyle.Left;
+            ordersListBox.Width = 300;
+            ordersListBox.SelectedIndexChanged += OrdersListBox_SelectedIndexChanged;
+            Controls.Add(ordersListBox);
+
+            // Display order content
+            orderDetailsBox.Dock = DockStyle.Fill;
+            orderDetailsBox.Multiline = true;
+            orderDetailsBox.ReadOnly = true;
+            orderDetailsBox.ScrollBars = ScrollBars.Both;
+            Controls.Add(orderDetailsBox);
+
+            LoadSavedOrders();
+        }
+
+        private void LoadSavedOrders()
+        {
+            string folderPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "SavedOrders");
+            if (!Directory.Exists(folderPath))
+            {
+                MessageBox.Show("No saved orders found.");
+                return;
+            }
+
+            var files = Directory.GetFiles(folderPath, "*.txt")
+                                 .OrderByDescending(File.GetCreationTime)
+                                 .ToArray();
+
+            if (files.Length == 0)
+            {
+                MessageBox.Show("No saved orders found.");
+                return;
+            }
+
+            foreach (var file in files)
+            {
+                string fileName = Path.GetFileNameWithoutExtension(file); // e.g. order_John_Doe_20250725_224343
+                string[] parts = fileName.Split('_');
+
+                string displayName = fileName;
+
+                if (parts.Length >= 2)
+                {
+                    string datePart = parts[^2] + "_" + parts[^1]; // Get last two parts
+                    if (DateTime.TryParseExact(datePart, "yyyyMMdd_HHmmss", null, DateTimeStyles.None, out DateTime dt))
+                    {
+                        displayName = $"{dt:MMMM dd, yyyy - hh:mm:ss tt}";
+                    }
+                }
+
+                ordersListBox.Items.Add(new SavedOrderDisplay { FilePath = file, DisplayName = displayName });
+            }
+
+            ordersListBox.DisplayMember = "DisplayName";
+        }
+
+        private void OrdersListBox_SelectedIndexChanged(object? sender, EventArgs e)
+        {
+            if (ordersListBox.SelectedItem is SavedOrderDisplay selected)
+            {
+                if (File.Exists(selected.FilePath))
+                {
+                    orderDetailsBox.Text = File.ReadAllText(selected.FilePath);
+                }
+                else
+                {
+                    orderDetailsBox.Text = "Order file not found.";
+                }
+            }
+        }
+        private class SavedOrderDisplay
+        {
+            public string? FilePath { get; set; }
+            public string? DisplayName { get; set; }
+
+           public override string ToString() => DisplayName ?? string.Empty;
+
+        }
+    }
+}
